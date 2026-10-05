@@ -82,7 +82,7 @@ Everything above can be changed in `config/grandwitch-common.toml`: how often sh
 
 ## Frequently asked
 
-**Is it hard to get back?** No: milk, the antidote, or killing the witch all work, and there is a command. A mouse also turns back by itself after a while.
+**Is it hard to get back?** No: drink the antidote (there is some in a chest in her house), kill the witch who did it, or just wait about four minutes. Milk can be switched on in the settings.
 **Can she kill me?** As a mouse you can be stamped on and hurt; as a player she throws potions of the mouse at you. Both can be switched off or toned down in the settings.
 **Will it break my villages?** No block is placed apart from her cottage and the little holes; villagers who are turned become mice and come back to themselves.
 
