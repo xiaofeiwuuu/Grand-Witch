@@ -1,0 +1,6 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#grandwitch:has_mouse_holes",
+  "features": "grandwitch:mouse_hole",
+  "step": "vegetal_decoration"
+}

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "grassy=false": {
+      "model": "grandwitch:block/mouse_tunnel_core"
+    },
+    "grassy=true": {
+      "model": "grandwitch:block/mouse_tunnel_core_grassy"
+    }
+  }
+}

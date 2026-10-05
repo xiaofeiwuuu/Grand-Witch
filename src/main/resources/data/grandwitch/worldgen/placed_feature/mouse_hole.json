@@ -1,0 +1,11 @@
+{
+  "feature": "grandwitch:mouse_hole",
+  "placement": [
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

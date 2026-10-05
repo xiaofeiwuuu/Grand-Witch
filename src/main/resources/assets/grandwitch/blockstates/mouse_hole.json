@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "grandwitch:block/mouse_hole"
+    },
+    "facing=south": {
+      "model": "grandwitch:block/mouse_hole"
+    },
+    "facing=east": {
+      "model": "grandwitch:block/mouse_hole",
+      "y": 90
+    },
+    "facing=west": {
+      "model": "grandwitch:block/mouse_hole",
+      "y": 90
+    }
+  }
+}
