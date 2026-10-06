@@ -24,7 +24,7 @@
  "message.grandwitch.trespass": "A shriek from the house: the Grand Witch is coming back!",
  "entity.grandwitch.girl": "Girl",
  "block.grandwitch.mouse_tunnel": "Mouse Tunnel",
- "message.grandwitch.dig_level": "You can only dig soft ground level with your feet, not up or down",
+ "message.grandwitch.dig_level": "You can only dig soft ground level with your feet, or the one block straight above or below you",
  "book.grandwitch.diary.1": "Another village.\n\nThere are children all over the place, and they give me a headache. I hate children: their laughter, the smell of milk on them.\n\nBut they are the easiest to coax: a basket of cakes, a few soft words, and they follow me like lambs.",
  "book.grandwitch.diary.2": "Today I was a little girl with a basket, in a red hood, and the villagers all said how sweet I was. Ha.\n\nTomorrow it may be a lass in an apron with plaits, or an old woman on a stick, or a trader on the road, or a nanny minding other people's children. No one will look at me twice.",
  "book.grandwitch.diary.3": "My cakes are marvellous.\n\nThey look like anything out of the oven, and when someone bites one, even I cannot say whether it is for good or ill: that depends on my mood at the time.\n\nSome laugh with delight. Some squeak. I do love to watch.",
@@ -68,5 +68,7 @@
  "message.grandwitch.witch_back": "The Grand Witch is herself again!",
  "message.grandwitch.broom.mouse": "A mouse cannot get up on a broom",
  "item.grandwitch.plague_virus": "Plague Virus",
- "item.grandwitch.plague_virus.tip": "Taken from wild mice (a player has to kill them) and from the witch. Add it to an awkward potion in a brewing stand for the potion of the mouse; gunpowder makes it splash, dragon's breath lingering, and a lingering one with arrows makes tipped arrows."
+ "item.grandwitch.plague_virus.tip": "Taken from wild mice (a player has to kill them) and from the witch. Add it to an awkward potion in a brewing stand for the potion of the mouse; gunpowder makes it splash, dragon's breath lingering, and a lingering one with arrows makes tipped arrows.",
+ "message.grandwitch.dig_hard": "Too hard: a mouse can only dig soft ground, like dirt and grass",
+ "message.grandwitch.dig_tunnel": "You are pointing at the tunnel itself: aim at the ground beside it, or at the wall between two tunnels to dig through"
 }

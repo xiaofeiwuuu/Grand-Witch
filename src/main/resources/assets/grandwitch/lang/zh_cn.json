@@ -24,7 +24,7 @@
  "message.grandwitch.trespass": "小屋里传来一声尖叫——大女巫回来了！",
  "entity.grandwitch.girl": "少女",
  "block.grandwitch.mouse_tunnel": "老鼠隧道",
- "message.grandwitch.dig_level": "只能挖和你脚下同一层的泥土，不能向上下挖",
+ "message.grandwitch.dig_level": "只能挖和你脚下同一层的土，或者正上方、正下方的一格",
  "book.grandwitch.diary.1": "又换了个村子。\n\n这里的孩子多得很，吵得我头疼。我讨厌孩子，讨厌他们的笑声，讨厌他们身上的奶味。\n\n不过他们倒是最好哄：一篮点心，几句软话，就乖乖跟着我走。",
  "book.grandwitch.diary.2": "今天扮了个提篮子的小姑娘，戴着红兜帽，村里人都夸我可爱，哈。\n\n明天也许是系围裙梳辫子的丫头，也许是拄拐的老太婆，也许是赶路的商人，也许是替人看孩子的保姆。没人会多看我一眼。",
  "book.grandwitch.diary.3": "我的点心，真是妙。\n\n和炉子里端出来的没两样，谁咬上一口，是福是祸，连我自己也说不准，全凭那一刻我的心情。\n\n有人吃了乐得直笑，有人吃了吱吱乱叫，我就爱看这个。",
@@ -68,5 +68,7 @@
  "message.grandwitch.witch_back": "大女巫变回来了！",
  "message.grandwitch.broom.mouse": "老鼠够不着扫把",
  "item.grandwitch.plague_virus": "鼠疫病毒",
- "item.grandwitch.plague_virus.tip": "取自野生老鼠（要玩家亲手杀）和女巫。粗制药水加它，在酿造台炼成变鼠药水；火药变喷溅，龙息变滞留，滞留药水加箭就是药水箭。"
+ "item.grandwitch.plague_virus.tip": "取自野生老鼠（要玩家亲手杀）和女巫。粗制药水加它，在酿造台炼成变鼠药水；火药变喷溅，龙息变滞留，滞留药水加箭就是药水箭。",
+ "message.grandwitch.dig_hard": "这个太硬了：老鼠只能挖泥土、草方块这类软土",
+ "message.grandwitch.dig_tunnel": "你点中的是隧道本身：请对着旁边的土挖；要和隔壁的隧道打通，就对着中间那面墙挖"
 }

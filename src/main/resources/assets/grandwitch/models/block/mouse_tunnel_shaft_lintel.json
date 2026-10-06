@@ -1,0 +1,77 @@
+{
+  "textures": {
+    "dirt": "minecraft:block/dirt",
+    "particle": "minecraft:block/dirt"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        8,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        3.25
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            8
+          ],
+          "texture": "#dirt",
+          "cullface": "north"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            8
+          ],
+          "texture": "#dirt"
+        },
+        "east": {
+          "uv": [
+            0,
+            0,
+            3.25,
+            8
+          ],
+          "texture": "#dirt"
+        },
+        "west": {
+          "uv": [
+            12.75,
+            0,
+            16,
+            8
+          ],
+          "texture": "#dirt"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            3.25
+          ],
+          "texture": "#dirt"
+        },
+        "down": {
+          "uv": [
+            0,
+            12.75,
+            16,
+            16
+          ],
+          "texture": "#dirt"
+        }
+      }
+    }
+  ]
+}

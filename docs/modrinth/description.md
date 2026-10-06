@@ -8,10 +8,6 @@ Being a mouse is a whole different game: the world gets big, the cats come for y
 
 > **Status: early release (0.1.0).** The game is playable from start to finish and is covered by automated tests, but it has had little play-testing. Please report anything odd on the issue tracker.
 
-Made with the help of AI (Claude): code, text and artwork.
-
-本项目的代码、文案和图片由 AI（Claude）协助制作。
-
 ## The witch
 
 - **Four kinds, many faces.** A *gift girl*, a *potion granny*, a *cursed-gift trader* and a *nanny* who leads village children away. She looks like a villager or trader until she is found out.

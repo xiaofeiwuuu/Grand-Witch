@@ -680,6 +680,12 @@ public class GrandWitch extends PathfinderMob {
         reachTrail.append(tickCount).append(':').append(what).append(' ');
     }
 
+    /** Why she was last not going to reach into a hole (for a test to say). */
+    String reachWhy = "not asked yet";
+
+    /** One in this many times she is asked, she tries for a mouse that is six or seven blocks in; a test lowers it. */
+    static int gropeOneIn = 40;
+
     private LivingEntity lastVictim;
     private int lastSeen;
     private int reachCooldown;
@@ -1479,6 +1485,15 @@ public class GrandWitch extends PathfinderMob {
             return level.getBlockState(p).getCollisionShape(level, p).isEmpty();
         }
 
+        /** Whether the block here, a tunnel or a hole, is open on this side: a hole at its two ends, a tunnel where its side is not shut. */
+        private static boolean open(Level level, BlockPos pos, Direction side) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(ModBlocks.MOUSE_HOLE.get())) {
+                return state.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING).getAxis() == side.getAxis();
+            }
+            return state.is(ModBlocks.MOUSE_TUNNEL.get()) && MouseTunnelBlock.isOpen(state, side);
+        }
+
         /**
          * A side she could lie down at to reach in at this block flat along the ground: a free place next to it that the tunnel is open to, with ground under it. Which way
          * from the block that place is; nearest her first.
@@ -1488,8 +1503,8 @@ public class GrandWitch extends PathfinderMob {
             List<Direction> ways = new ArrayList<>(Direction.Plane.HORIZONTAL.stream().toList());
             ways.sort(java.util.Comparator.comparingDouble(d -> witch.distanceToSqr(mouth.getX() + 0.5D + d.getStepX(), mouth.getY(), mouth.getZ() + 0.5D + d.getStepZ())));
             for (Direction d : ways) {
-                if (state.is(ModBlocks.MOUSE_HOLE.get()) && state.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING).getAxis() != d.getAxis()) {
-                    continue;                                 // a hole is open at its two ends
+                if (!open(level, mouth, d)) {
+                    continue;                                 // a hole is open at its two ends, a tunnel where it is not shut
                 }
                 BlockPos front = mouth.relative(d);
                 if (!net(level, front) && free(level, front) && free(level, front.above()) && level.getBlockState(front.below()).isFaceSturdy(level, front.below(), Direction.UP)) {
@@ -1517,9 +1532,9 @@ public class GrandWitch extends PathfinderMob {
                 BlockPos b = queue.poll();
                 order.add(b);
                 if (depth.get(b) < REACH + 2) {
-                    for (Direction d : Direction.values()) {
+                    for (Direction d : Direction.Plane.HORIZONTAL) {
                         BlockPos n = b.relative(d);
-                        if (!toward.containsKey(n) && net(level, n)) {
+                        if (!toward.containsKey(n) && net(level, n) && open(level, b, d) && open(level, n, d.getOpposite())) {      // only by the ways that are open at both ends
                             toward.put(n, b);
                             depth.put(n, depth.get(b) + 1);
                             queue.add(n);
@@ -1566,17 +1581,26 @@ public class GrandWitch extends PathfinderMob {
 
         @Override
         public boolean canUse() {
-            if (!WitchConfig.WITCH_REACH.get() || witch.isMouseForm() || witch.isDisguised() || witch.onBroom() || witch.reachCooldown > 0) {
+            if (!WitchConfig.WITCH_REACH.get()) {
+                witch.reachWhy = "setting off";
+                return false;
+            }
+            if (witch.isMouseForm() || witch.isDisguised() || witch.onBroom() || witch.reachCooldown > 0) {
+                witch.reachWhy = (witch.isMouseForm() ? "mouse-form " : "") + (witch.isDisguised() ? "disguised " : "") + (witch.onBroom() ? "on-broom " : "") + (witch.reachCooldown > 0 ? "cooldown " + witch.reachCooldown : "");
                 return false;
             }
             LivingEntity v = witch.lastVictim;
             if (v == null || !v.isAlive() || v.isSpectator() || witch.tickCount - witch.lastSeen > 600 || !isMouseLike(v) || witch.exempt(v) || !MouseHoleBlock.hidden(v)) {
+                witch.reachWhy = v == null ? "no victim" : !v.isAlive() ? "victim dead" : witch.tickCount - witch.lastSeen > 600 ? "victim forgotten" : witch.exempt(v) ? "victim exempt" : !MouseHoleBlock.hidden(v) ? "victim not hidden at " + v.blockPosition() : "other";
                 return false;
             }
             // one that is 6 or 7 blocks in is only tried for now and then, at random
-            if (!plan(v, witch.random.nextInt(40) == 0)) {
+            boolean roll = witch.random.nextInt(gropeOneIn) == 0;
+            if (!plan(v, roll)) {
+                witch.reachWhy = "no way in (roll " + roll + ")";
                 return false;
             }
+            witch.reachWhy = "ok";
             victim = v;
             return true;
         }

@@ -41,6 +41,7 @@ public final class MouseClient {
 
     /** From {@link com.xiaofeiwu.grandwitch.MousePacket}: the state, and the box to match it. */
     public static void apply(UUID id, boolean mouse) {
+        com.mojang.logging.LogUtils.getLogger().info("[grandwitch] client: told that {} is {} a mouse", id, mouse ? "now" : "no longer");
         Mice.setClient(id, mouse);
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null) {
@@ -123,6 +124,41 @@ public final class MouseClient {
             }
             visionOn = false;
             visionFailed = false;
+        }
+    }
+
+    private static java.lang.reflect.Method setCameraPosition;
+    private static boolean toldAboutEyes;
+
+    /**
+     * The eyes of a mouse are low (0.3 of a block up). They are made so by its size; but another mod can have the last word on where a player's eyes are (a mod that scales
+     * players, or moves the camera), and then the view stays up at a person's height. So the camera itself is brought down by the difference, in the first person.
+     */
+    @SubscribeEvent
+    public static void lowerCamera(net.minecraftforge.client.event.ViewportEvent.ComputeCameraAngles event) {
+        Minecraft mc = Minecraft.getInstance();
+        net.minecraft.client.Camera camera = event.getCamera();
+        if (mc.player == null || camera.getEntity() != mc.player || camera.isDetached() || !Mice.isMouse(mc.player)) {
+            toldAboutEyes = false;
+            return;
+        }
+        float extra = mc.player.getEyeHeight() - 0.3F;
+        if (extra <= 0.05F) {
+            return;                                  // the eyes are low already
+        }
+        if (!toldAboutEyes) {
+            toldAboutEyes = true;
+            com.mojang.logging.LogUtils.getLogger().info("[grandwitch] client: the eyes of the mouse are {} up, not 0.3: the camera is lowered by the difference (the box is {} by {})",
+                    mc.player.getEyeHeight(), mc.player.getBbWidth(), mc.player.getBbHeight());
+        }
+        try {
+            if (setCameraPosition == null) {
+                setCameraPosition = net.minecraftforge.fml.util.ObfuscationReflectionHelper.findMethod(net.minecraft.client.Camera.class, "m_90584_", double.class, double.class, double.class);
+            }
+            net.minecraft.world.phys.Vec3 at = camera.getPosition();
+            setCameraPosition.invoke(camera, at.x, at.y - extra, at.z);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            // only a view: not worth the game
         }
     }
 

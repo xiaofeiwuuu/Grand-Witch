@@ -993,7 +993,7 @@ public final class GrandWitchGameTests {
     }
 
     @GameTest(batch = "w49", template = "field", setupTicks = 20, timeoutTicks = 100)
-    public static void aMouseDigsSlowlyAndStartsDiggingOnlyInSoftGround(GameTestHelper h) {
+    public static void aMouseDigsSoftGroundAsFastAsWithAShovelAndStartsDiggingOnlyThere(GameTestHelper h) {
         floor(h);
         h.setBlock(new BlockPos(5, 1, 5), Blocks.DIRT);
         h.setBlock(new BlockPos(6, 1, 5), Blocks.STONE);
@@ -1004,7 +1004,12 @@ public final class GrandWitchGameTests {
         Mice.digSpeed(slow);
         var normal = new net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed(plain, h.getLevel().getBlockState(h.absolutePos(new BlockPos(5, 1, 5))), 1.0F, h.absolutePos(new BlockPos(5, 1, 5)));
         Mice.digSpeed(normal);
-        h.assertTrue(slow.getNewSpeed() < 1.0F && normal.getNewSpeed() == 1.0F, "the speeds are " + slow.getNewSpeed() + " and " + normal.getNewSpeed());
+        mouse.setOnGround(true);
+        var onGround = new net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed(mouse, h.getLevel().getBlockState(h.absolutePos(new BlockPos(5, 1, 5))), 1.0F, h.absolutePos(new BlockPos(5, 1, 5)));
+        Mice.digSpeed(onGround);
+        h.assertTrue(Math.abs(slow.getNewSpeed() - WitchConfig.MOUSE_DIG_SPEED.get().floatValue() / 5.0F) < 1.0E-3F, "in the air a mouse does not dig a fifth as fast: " + slow.getNewSpeed());
+        h.assertTrue(Math.abs(onGround.getNewSpeed() - WitchConfig.MOUSE_DIG_SPEED.get().floatValue()) < 1.0E-3F && normal.getNewSpeed() == 1.0F,
+                "the speeds are " + onGround.getNewSpeed() + " (on the ground) and " + normal.getNewSpeed() + " (a person)");
         var onDirt = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, h.absolutePos(new BlockPos(5, 1, 5)), net.minecraft.core.Direction.UP, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
         Mice.startBreaking(onDirt);
         var onStone = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, h.absolutePos(new BlockPos(6, 1, 5)), net.minecraft.core.Direction.UP, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
@@ -1040,7 +1045,7 @@ public final class GrandWitchGameTests {
     }
 
     @GameTest(batch = "w51", template = "field", setupTicks = 20, timeoutTicks = 100)
-    public static void aDugBlockIsACrossAndFromInsideItTheNextBlockInAnyDirectionCanBeDug(GameTestHelper h) {
+    public static void aDugBlockIsShutOnAllSidesBeyondWhichIsGroundAndFromInsideItTheNextBlockInAnyDirectionCanStillBeDug(GameTestHelper h) {
         floor(h);
         for (int x = 3; x <= 9; x++) {
             for (int z = 3; z <= 9; z++) {
@@ -1052,10 +1057,14 @@ public final class GrandWitchGameTests {
         put(h, mouse, 6, 2);                                          // outside, level with the dirt
         breakAt(h, mouse, new BlockPos(6, 1, 3));                     // the first one, dug from outside
         BlockPos first = h.absolutePos(new BlockPos(6, 1, 3));
-        // a cross: a mouse fits in the middle and well out toward each of the four sides, and a player in none
-        for (double[] d : new double[][]{{0, 0}, {0, -0.3}, {0, 0.3}, {0.3, 0}, {-0.3, 0}}) {
+        // open to the air it was dug from (north) and shut, with a wall of earth, on the other three sides (ground beyond): a mouse fits in the middle and well out toward the open side, and not into the walls
+        for (double[] d : new double[][]{{0, 0}, {0, -0.3}}) {
             var box = new net.minecraft.world.phys.AABB(first.getX() + 0.5D + d[0] - 0.2D, first.getY(), first.getZ() + 0.5D + d[1] - 0.2D, first.getX() + 0.5D + d[0] + 0.2D, first.getY() + 0.4D, first.getZ() + 0.5D + d[1] + 0.2D);
             h.assertTrue(h.getLevel().noCollision(box), "a mouse does not fit at " + d[0] + "," + d[1]);
+        }
+        for (double[] d : new double[][]{{0, 0.3}, {0.3, 0}, {-0.3, 0}}) {
+            var box = new net.minecraft.world.phys.AABB(first.getX() + 0.5D + d[0] - 0.2D, first.getY(), first.getZ() + 0.5D + d[1] - 0.2D, first.getX() + 0.5D + d[0] + 0.2D, first.getY() + 0.4D, first.getZ() + 0.5D + d[1] + 0.2D);
+            h.assertTrue(!h.getLevel().noCollision(box), "a mouse goes into the wall of a shut side at " + d[0] + "," + d[1]);
         }
         var player = new net.minecraft.world.phys.AABB(first.getX() + 0.5D - 0.3D, first.getY(), first.getZ() + 0.5D - 0.3D, first.getX() + 0.5D + 0.3D, first.getY() + 1.8D, first.getZ() + 0.5D + 0.3D);
         h.assertTrue(!h.getLevel().noCollision(player), "a player fits in a tunnel");
@@ -1082,19 +1091,23 @@ public final class GrandWitchGameTests {
     }
 
     @GameTest(batch = "w52", template = "field", setupTicks = 20, timeoutTicks = 100)
-    public static void aMouseDoesNotDigDownOrUpAndAShovelClearsATunnelAndGivesDirt(GameTestHelper h) {
+    public static void aMouseDigsOnlyTheBlockStraightAboveOrBelowAndNotFurtherOrToTheSide(GameTestHelper h) {
         floor(h);
         h.setBlock(new BlockPos(5, 1, 5), Blocks.DIRT);
         h.setBlock(new BlockPos(5, 3, 5), Blocks.DIRT);
         Player mouse = h.makeMockPlayer();
         Mice.become(mouse, null, 60);
         put(h, mouse, 5, 3);                                         // standing on the floor, with the dirt of two cells away at its own level (y 1) and one higher (y 3)
-        var down = new BlockPos(5, 0, 3);                            // the floor under the mouse, made dirt: it is below it, so it is not dug
+        var down = new BlockPos(5, 0, 3);                            // the floor under the mouse, made dirt: it is straight below it, so it is dug (a way down)
         h.setBlock(down, Blocks.DIRT);
         breakAt(h, mouse, down);
-        h.assertTrue(h.getLevel().getBlockState(h.absolutePos(down)).is(Blocks.DIRT), "a mouse dug down");
+        h.assertTrue(h.getLevel().getBlockState(h.absolutePos(down)).is(ModBlocks.MOUSE_TUNNEL.get()), "a mouse could not dig straight down");
         breakAt(h, mouse, new BlockPos(5, 3, 5));
-        h.assertTrue(h.getLevel().getBlockState(h.absolutePos(new BlockPos(5, 3, 5))).is(Blocks.DIRT), "a mouse dug up");
+        h.assertTrue(h.getLevel().getBlockState(h.absolutePos(new BlockPos(5, 3, 5))).is(Blocks.DIRT), "a mouse dug a block that is up and two to the side");
+        var twoUp = new BlockPos(5, 3, 3);                           // two straight up from its feet: not the one above it
+        h.setBlock(twoUp, Blocks.DIRT);
+        breakAt(h, mouse, twoUp);
+        h.assertTrue(h.getLevel().getBlockState(h.absolutePos(twoUp)).is(Blocks.DIRT), "a mouse dug two blocks up");
         h.succeed();
     }
 
@@ -2019,6 +2032,7 @@ public final class GrandWitchGameTests {
             h.assertTrue(MouseHoleBlock.hidden(far), "the one six blocks in was pulled out");
             h.assertTrue(other.armPath().length <= 5, "she reached further than five blocks: " + other.armPath().length);
             GrandWitch.gropeLuck = -1.0F;
+            GrandWitch.gropeOneIn = 40;
         });
     }
 
@@ -2066,6 +2080,7 @@ public final class GrandWitchGameTests {
     @GameTest(batch = "w92", template = "field", setupTicks = 20, timeoutTicks = 700)
     public static void theWitchFeelsAboutWithAllOfHerArmForAMouseThatIsSixOrSevenBlocksInAndFindsNothing(GameTestHelper h) {
         floor(h);
+        GrandWitch.gropeOneIn = 1;
         GrandWitch.gropeLuck = 0.0F;
         for (int x = 6; x <= 8; x++) {
             for (int z = 9; z <= 17; z++) {
@@ -2082,16 +2097,18 @@ public final class GrandWitchGameTests {
         GrandWitch witch = h.spawn(ModEntities.GRAND_WITCH.get(), new BlockPos(3, 1, 4));
         witch.hunt(mouse);
         h.succeedWhen(() -> {
-            h.assertTrue(witch.isProne() && witch.armTicks() >= GrandWitch.ARM_FULL, "she has not put her arm in: prone=" + witch.isProne() + " arm=" + witch.armTicks() + " at " + witch.position() + " disguised=" + witch.isDisguised() + " alive=" + witch.isAlive() + " trail: " + witch.reachTrail);
+            h.assertTrue(witch.isProne() && witch.armTicks() >= GrandWitch.ARM_FULL, "she has not put her arm in: prone=" + witch.isProne() + " arm=" + witch.armTicks() + " at " + witch.position() + " disguised=" + witch.isDisguised() + " alive=" + witch.isAlive() + " why-not: " + witch.reachWhy + " trail: " + witch.reachTrail);
             h.assertTrue(witch.armPath().length == 5, "her arm is " + witch.armPath().length + " blocks, not the 5 it goes");
             h.assertTrue(MouseHoleBlock.hidden(mouse), "she got hold of it");
             GrandWitch.gropeLuck = -1.0F;
+            GrandWitch.gropeOneIn = 40;
         });
     }
 
     @GameTest(batch = "w93", template = "field", setupTicks = 20, timeoutTicks = 700)
     public static void theWitchSometimesGetsHoldOfAMouseThatIsAtTheSeventhBlockByStretching(GameTestHelper h) {
         floor(h);
+        GrandWitch.gropeOneIn = 1;
         GrandWitch.gropeLuck = 1.0F;
         for (int x = 6; x <= 8; x++) {
             for (int z = 9; z <= 17; z++) {
@@ -2110,6 +2127,7 @@ public final class GrandWitchGameTests {
         h.succeedWhen(() -> {
             h.assertTrue(!MouseHoleBlock.hidden(mouse), "she did not get hold of it: " + mouse.position() + " prone=" + witch.isProne() + " disguised=" + witch.isDisguised() + " at " + witch.position() + " trail: " + witch.reachTrail);
             GrandWitch.gropeLuck = -1.0F;
+            GrandWitch.gropeOneIn = 40;
         });
     }
 
@@ -2403,6 +2421,400 @@ public final class GrandWitchGameTests {
             tunnel++;
         }
         h.assertTrue(tunnel >= 2 && tunnel <= 3, "the tunnel is " + tunnel + " blocks, not two or three");
+        var toHole = facing.getOpposite();
+        for (int k = 1; k <= tunnel; k++) {
+            var block = h.getBlockState(hole.relative(facing, k));
+            h.assertTrue(MouseTunnelBlock.isOpen(block, toHole), "block " + k + " of the tunnel is shut toward the hole");
+            h.assertTrue(MouseTunnelBlock.isOpen(block, facing) == (k < tunnel), "block " + k + " of the tunnel is " + (k < tunnel ? "shut" : "open") + " toward the way on");
+            h.assertTrue(!MouseTunnelBlock.isOpen(block, facing.getClockWise()) && !MouseTunnelBlock.isOpen(block, facing.getCounterClockWise()), "block " + k + " of the tunnel is open at its sides");
+        }
+        h.succeed();
+    }
+
+    @GameTest(batch = "w106", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aMouseCanUseOnlyWhatItCanEatOrDrinkAndNoToolOrWeaponOrBowOrBucketOrBlock(GameTestHelper h) {
+        floor(h);
+        for (ItemStack ok : new ItemStack[]{ItemStack.EMPTY, new ItemStack(Items.BREAD), new ItemStack(Items.GOLDEN_APPLE), ModEffects.drinkable(), new ItemStack(ModItems.ANTIDOTE.get()), new ItemStack(Items.MILK_BUCKET), new ItemStack(Items.COOKIE)}) {
+            h.assertTrue(Mice.pawsCanUse(ok), "a mouse cannot use " + ok);
+        }
+        for (ItemStack no : new ItemStack[]{new ItemStack(Items.DIAMOND_SWORD), new ItemStack(Items.DIAMOND_PICKAXE), new ItemStack(Items.IRON_SHOVEL), new ItemStack(Items.BOW), new ItemStack(Items.CROSSBOW),
+                new ItemStack(Items.BUCKET), new ItemStack(Items.WATER_BUCKET), new ItemStack(Items.STONE), new ItemStack(Items.SHEARS), new ItemStack(Items.LEAD), ModEffects.splash(),
+                new ItemStack(Items.ENDER_PEARL), new ItemStack(Items.FLINT_AND_STEEL), new ItemStack(Items.SHIELD)}) {
+            h.assertTrue(!Mice.pawsCanUse(no), "a mouse can use " + no);
+        }
+        Player mouse = h.makeMockPlayer();
+        put(h, mouse, 7, 7);
+        Mice.become(mouse, null, 60);
+        var target = h.spawn(EntityType.COW, new BlockPos(8, 1, 7));
+        mouse.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
+        var bus = net.minecraftforge.common.MinecraftForge.EVENT_BUS;
+        h.assertTrue(bus.post(new net.minecraftforge.event.entity.player.AttackEntityEvent(mouse, target)), "a mouse struck with a sword");
+        h.assertTrue(bus.post(new net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickItem(mouse, InteractionHand.MAIN_HAND)), "a mouse used a sword");
+        h.assertTrue(bus.post(new net.minecraftforge.event.entity.living.LivingEntityUseItemEvent.Start(mouse, new ItemStack(Items.BOW), 72000)), "a mouse drew a bow");
+        h.assertTrue(bus.post(new net.minecraftforge.event.entity.player.PlayerInteractEvent.EntityInteract(mouse, InteractionHand.MAIN_HAND, target)), "a mouse used a sword on a cow");
+        // what it digs (soft ground) it digs as with a shovel, whatever it holds, and what it cannot dig it does slowly; in the air it is a fifth
+        mouse.setOnGround(true);
+        var dirt = new net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed(mouse, Blocks.DIRT.defaultBlockState(), 1.0F, h.absolutePos(new BlockPos(5, 0, 5)));
+        bus.post(dirt);
+        h.assertTrue(Math.abs(dirt.getNewSpeed() - WitchConfig.MOUSE_DIG_SPEED.get().floatValue()) < 1.0E-3F, "a mouse does not dig soft ground at the speed set: " + dirt.getNewSpeed());
+        var stone = new net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed(mouse, Blocks.STONE.defaultBlockState(), 8.0F, h.absolutePos(new BlockPos(5, 0, 5)));
+        bus.post(stone);
+        h.assertTrue(stone.getNewSpeed() <= 0.6F + 1.0E-4F, "a tool made a mouse dig what it cannot dig faster than with its paws: " + stone.getNewSpeed());
+        mouse.setOnGround(false);
+        var air = new net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed(mouse, Blocks.DIRT.defaultBlockState(), 1.0F, h.absolutePos(new BlockPos(5, 0, 5)));
+        bus.post(air);
+        h.assertTrue(Math.abs(air.getNewSpeed() - WitchConfig.MOUSE_DIG_SPEED.get().floatValue() / 5.0F) < 1.0E-3F, "a mouse in the air digs at " + air.getNewSpeed());
+        mouse.setOnGround(true);
+        // with nothing in its paws, or something to eat, it does as it did
+        mouse.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        h.assertTrue(!bus.post(new net.minecraftforge.event.entity.player.AttackEntityEvent(mouse, target)), "a mouse could not bite with nothing in its paws");
+        mouse.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.BREAD));
+        h.assertTrue(!bus.post(new net.minecraftforge.event.entity.player.PlayerInteractEvent.RightClickItem(mouse, InteractionHand.MAIN_HAND)), "a mouse could not use bread");
+        h.assertTrue(!bus.post(new net.minecraftforge.event.entity.living.LivingEntityUseItemEvent.Start(mouse, new ItemStack(Items.BREAD), 32)), "a mouse could not start to eat");
+        // and not a mouse: as ever
+        Player person = h.makeMockPlayer();
+        person.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
+        h.assertTrue(!bus.post(new net.minecraftforge.event.entity.player.AttackEntityEvent(person, target)), "a person could not strike with a sword");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w107", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aDugBlockIsOpenOnlyToWhereTheMouseCameFromAndTheNextOnlyOnTheSideDugThrough(GameTestHelper h) {
+        floor(h);
+        for (int x = 5; x <= 7; x++) {
+            for (int z = 3; z <= 6; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.DIRT);
+            }
+        }
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        put(h, mouse, 4, 5);                                   // outside, level with the dirt
+        breakAt(h, mouse, new BlockPos(5, 1, 5));
+        var first = h.getBlockState(new BlockPos(5, 1, 5));
+        h.assertTrue(first.is(ModBlocks.MOUSE_TUNNEL.get()), "no tunnel was made");
+        h.assertTrue(MouseTunnelBlock.isOpen(first, net.minecraft.core.Direction.WEST), "it is not open toward where the mouse stood");
+        h.assertTrue(!MouseTunnelBlock.isOpen(first, net.minecraft.core.Direction.EAST) && !MouseTunnelBlock.isOpen(first, net.minecraft.core.Direction.NORTH) && !MouseTunnelBlock.isOpen(first, net.minecraft.core.Direction.SOUTH),
+                "it is open on a side it was not dug through: " + first);
+        // the mouse goes in, and digs on east: that block is open toward this one, and this one opens toward it, and nothing else is opened
+        put(h, mouse, 5, 5);
+        breakAt(h, mouse, new BlockPos(6, 1, 5));
+        var firstNow = h.getBlockState(new BlockPos(5, 1, 5));
+        var second = h.getBlockState(new BlockPos(6, 1, 5));
+        h.assertTrue(MouseTunnelBlock.isOpen(second, net.minecraft.core.Direction.WEST) && !MouseTunnelBlock.isOpen(second, net.minecraft.core.Direction.EAST)
+                && !MouseTunnelBlock.isOpen(second, net.minecraft.core.Direction.NORTH) && !MouseTunnelBlock.isOpen(second, net.minecraft.core.Direction.SOUTH), "the second block is not open only toward the first: " + second);
+        h.assertTrue(MouseTunnelBlock.isOpen(firstNow, net.minecraft.core.Direction.EAST) && MouseTunnelBlock.isOpen(firstNow, net.minecraft.core.Direction.WEST)
+                && !MouseTunnelBlock.isOpen(firstNow, net.minecraft.core.Direction.NORTH) && !MouseTunnelBlock.isOpen(firstNow, net.minecraft.core.Direction.SOUTH), "the first block did not open toward the second, and only that: " + firstNow);
+        // and on the north, from the second block
+        put(h, mouse, 6, 5);
+        breakAt(h, mouse, new BlockPos(6, 1, 4));
+        var secondNow = h.getBlockState(new BlockPos(6, 1, 5));
+        var third = h.getBlockState(new BlockPos(6, 1, 4));
+        h.assertTrue(MouseTunnelBlock.isOpen(third, net.minecraft.core.Direction.SOUTH) && !MouseTunnelBlock.isOpen(third, net.minecraft.core.Direction.NORTH), "the third block is not open only toward the second: " + third);
+        h.assertTrue(MouseTunnelBlock.isOpen(secondNow, net.minecraft.core.Direction.NORTH) && MouseTunnelBlock.isOpen(secondNow, net.minecraft.core.Direction.WEST) && !MouseTunnelBlock.isOpen(secondNow, net.minecraft.core.Direction.SOUTH),
+                "the second block did not open toward the third, and only that: " + secondNow);
+        h.succeed();
+    }
+
+    @GameTest(batch = "w108", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aShutSideOfATunnelIsAWallToWhatWalksAndNotToTheEyeAndOneMadeBeforeIsOpenOnAllSides(GameTestHelper h) {
+        floor(h);
+        var old = ModBlocks.MOUSE_TUNNEL.get().defaultBlockState();
+        for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            h.assertTrue(MouseTunnelBlock.isOpen(old, d), "a tunnel that is not told otherwise is shut on " + d);
+        }
+        var west = MouseTunnelBlock.shut(false).setValue(MouseTunnelBlock.side(net.minecraft.core.Direction.WEST), true);
+        BlockPos at = h.absolutePos(new BlockPos(5, 1, 5));
+        var inNorthWall = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.1D, 0.02D, 0.7D, 0.4D, 0.05D));
+        var inWestWall = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.02D, 0.1D, 0.3D, 0.05D, 0.4D, 0.7D));
+        var collision = west.getCollisionShape(h.getLevel(), at);
+        var outline = west.getShape(h.getLevel(), at);
+        var and = net.minecraft.world.phys.shapes.BooleanOp.AND;
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(collision, inNorthWall, and), "a shut side (north) is no wall to what walks");
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(collision, inWestWall, and), "the open side (west) has a wall in it");
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(outline, inNorthWall, and), "the eye is stopped by a shut side (north), so what is beyond it cannot be dug");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w109", template = "field", setupTicks = 20, timeoutTicks = 500)
+    public static void theWitchsArmDoesNotGoThroughASideThatIsShut(GameTestHelper h) {
+        floor(h);
+        for (int x = 6; x <= 8; x++) {
+            for (int z = 9; z <= 15; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.DIRT.defaultBlockState());
+            }
+        }
+        for (int z = 9; z <= 13; z++) {
+            var block = ModBlocks.MOUSE_TUNNEL.get().defaultBlockState();
+            if (z == 10) {
+                block = block.setValue(MouseTunnelBlock.side(net.minecraft.core.Direction.SOUTH), false);      // between the second block and the third: shut
+            }
+            if (z == 11) {
+                block = block.setValue(MouseTunnelBlock.side(net.minecraft.core.Direction.NORTH), false);
+            }
+            h.setBlock(new BlockPos(7, 1, z), block);
+        }
+        BlockPos at = h.absolutePos(new BlockPos(7, 1, 12));
+        VillageMouse mouse = h.spawn(ModEntities.VILLAGE_MOUSE.get(), new BlockPos(7, 1, 12));
+        mouse.setPos(at.getX() + 0.5D, at.getY() + 0.1D, at.getZ() + 0.5D);
+        mouse.setNoAi(true);
+        GrandWitch witch = h.spawn(ModEntities.GRAND_WITCH.get(), new BlockPos(3, 1, 4));
+        witch.hunt(mouse);
+        h.runAfterDelay(300, () -> {
+            h.assertTrue(MouseHoleBlock.hidden(mouse) && !witch.isProne(), "she reached through a shut side: " + mouse.position() + " prone=" + witch.isProne() + " trail: " + witch.reachTrail);
+            h.succeed();
+        });
+    }
+
+    @GameTest(batch = "w110", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aBlockDugInAThinWallIsOpenToTheAirOnBothSidesAndShutToTheGroundBeside(GameTestHelper h) {
+        floor(h);
+        for (int x = 4; x <= 8; x++) {
+            h.setBlock(new BlockPos(x, 1, 8), Blocks.DIRT);                 // a wall of dirt, one block thick
+        }
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        put(h, mouse, 6, 7);
+        breakAt(h, mouse, new BlockPos(6, 1, 8));
+        var block = h.getBlockState(new BlockPos(6, 1, 8));
+        h.assertTrue(MouseTunnelBlock.isOpen(block, net.minecraft.core.Direction.NORTH) && MouseTunnelBlock.isOpen(block, net.minecraft.core.Direction.SOUTH), "it is shut toward the air on a side: " + block);
+        h.assertTrue(!MouseTunnelBlock.isOpen(block, net.minecraft.core.Direction.EAST) && !MouseTunnelBlock.isOpen(block, net.minecraft.core.Direction.WEST), "it is open toward the ground beside it: " + block);
+        h.succeed();
+    }
+
+    @GameTest(batch = "w111", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void twoTunnelsSideBySideAreNotJoinedOfThemselvesAndTheWallBetweenCanBeDugThroughByHand(GameTestHelper h) {
+        floor(h);
+        for (int x = 4; x <= 9; x++) {
+            for (int z = 4; z <= 6; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.DIRT);
+            }
+        }
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        // two blocks side by side, both dug from the south, as a player does: not joined
+        put(h, mouse, 5, 7);
+        breakAt(h, mouse, new BlockPos(5, 1, 6));
+        put(h, mouse, 6, 7);
+        breakAt(h, mouse, new BlockPos(6, 1, 6));
+        var a = h.getBlockState(new BlockPos(5, 1, 6));
+        var b = h.getBlockState(new BlockPos(6, 1, 6));
+        h.assertTrue(!MouseTunnelBlock.isOpen(a, net.minecraft.core.Direction.EAST) && !MouseTunnelBlock.isOpen(b, net.minecraft.core.Direction.WEST), "two tunnels side by side were joined of themselves: " + a + " / " + b);
+        // the wall between them can be pointed at (the eye comes to it) from inside one: it is part of what the eye is stopped by
+        BlockPos aPos = h.absolutePos(new BlockPos(5, 1, 6));
+        var east = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.95D, 0.1D, 0.3D, 0.98D, 0.4D, 0.7D));
+        var west = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.02D, 0.1D, 0.3D, 0.05D, 0.4D, 0.7D));
+        var and = net.minecraft.world.phys.shapes.BooleanOp.AND;
+        var eye = net.minecraft.world.phys.shapes.CollisionContext.of(mouse);                  // what the eye of a mouse is stopped by
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(a.getShape(h.getLevel(), aPos, eye), east, and), "the wall toward the next tunnel cannot be pointed at");
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(a.getShape(h.getLevel(), aPos, eye), west, and), "a wall with ground beyond it is pointed at (the eye should go through to the ground)");
+        // digging it: begun on the east wall (the face hit is the west face of it), and when it is done both sides are open, and the block is still there
+        put(h, mouse, 5, 6);
+        var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, aPos, net.minecraft.core.Direction.WEST, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+        Mice.startBreaking(begin);
+        h.assertTrue(!begin.isCanceled(), "a mouse is stopped from digging the wall between two tunnels");
+        breakAt(h, mouse, new BlockPos(5, 1, 6));
+        h.assertTrue(MouseTunnelBlock.isOpen(h.getBlockState(new BlockPos(5, 1, 6)), net.minecraft.core.Direction.EAST) && MouseTunnelBlock.isOpen(h.getBlockState(new BlockPos(6, 1, 6)), net.minecraft.core.Direction.WEST),
+                "the wall between was not dug through");
+        h.assertTrue(h.getBlockState(new BlockPos(5, 1, 6)).is(ModBlocks.MOUSE_TUNNEL.get()), "the tunnel block was broken");
+        // a wall with ground beyond it is not something to dig: it is stopped, and told why
+        var onGround = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, aPos, net.minecraft.core.Direction.EAST, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+        Mice.startBreaking(onGround);
+        h.assertTrue(onGround.isCanceled(), "a wall with ground beyond it can be dug as a wall");
+        h.succeed();
+    }
+
+    private static void standAt(GameTestHelper h, Player p, int x, int y, int z) {
+        BlockPos at = h.absolutePos(new BlockPos(x, y, z));
+        p.setPos(at.getX() + 0.5D, at.getY(), at.getZ() + 0.5D);
+    }
+
+    @GameTest(batch = "w112", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aMouseDigsStraightDownAndStraightUpAndItIsAShaftThatIsClimbed(GameTestHelper h) {
+        floor(h);
+        for (int y = 1; y <= 4; y++) {
+            h.setBlock(new BlockPos(5, y, 5), Blocks.DIRT);
+            h.setBlock(new BlockPos(9, y, 5), Blocks.DIRT);
+        }
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        var down = net.minecraft.core.Direction.DOWN;
+        var up = net.minecraft.core.Direction.UP;
+        // down from the top of the ground: the block below is open to the air above it (a pit), and the one under that is dug from inside it
+        standAt(h, mouse, 5, 5, 5);
+        breakAt(h, mouse, new BlockPos(5, 4, 5));
+        var first = h.getBlockState(new BlockPos(5, 4, 5));
+        h.assertTrue(first.is(ModBlocks.MOUSE_TUNNEL.get()) && MouseTunnelBlock.isOpen(first, up) && !MouseTunnelBlock.isOpen(first, down), "digging down from above did not make a block open above: " + first);
+        standAt(h, mouse, 5, 4, 5);
+        breakAt(h, mouse, new BlockPos(5, 3, 5));
+        var second = h.getBlockState(new BlockPos(5, 3, 5));
+        var firstNow = h.getBlockState(new BlockPos(5, 4, 5));
+        h.assertTrue(MouseTunnelBlock.isOpen(second, up) && !MouseTunnelBlock.isOpen(second, down), "the block dug below is not open above: " + second);
+        h.assertTrue(MouseTunnelBlock.isOpen(firstNow, down) && MouseTunnelBlock.isOpen(firstNow, up), "the block the mouse was in did not open below: " + firstNow);
+        // up from inside a tunnel: its roof goes, and the one above has no floor
+        h.setBlock(new BlockPos(9, 2, 5), MouseTunnelBlock.shut(false));
+        standAt(h, mouse, 9, 2, 5);
+        breakAt(h, mouse, new BlockPos(9, 3, 5));
+        var low = h.getBlockState(new BlockPos(9, 2, 5));
+        var high = h.getBlockState(new BlockPos(9, 3, 5));
+        h.assertTrue(MouseTunnelBlock.isOpen(low, up) && !MouseTunnelBlock.isOpen(low, down), "the tunnel it dug up from has not lost its roof: " + low);
+        h.assertTrue(MouseTunnelBlock.isOpen(high, down) && !MouseTunnelBlock.isOpen(high, up), "the block dug above is not open below: " + high);
+        // not two up, not diagonally: only what is straight above or below
+        standAt(h, mouse, 9, 2, 5);
+        h.assertTrue(!Mice.sameLevel(mouse, h.absolutePos(new BlockPos(9, 4, 5))), "a mouse can dig two blocks up");
+        h.assertTrue(!Mice.sameLevel(mouse, h.absolutePos(new BlockPos(10, 3, 5))), "a mouse can dig a block that is up and to the side");
+        // the shaft is climbed by what is as small as a mouse, and by nothing else; a tunnel that goes only across is not climbed
+        h.assertTrue(low.isLadder(h.getLevel(), h.absolutePos(new BlockPos(9, 2, 5)), mouse) && high.isLadder(h.getLevel(), h.absolutePos(new BlockPos(9, 3, 5)), mouse), "a shaft cannot be climbed by a mouse");
+        h.assertTrue(!MouseTunnelBlock.shut(false).isLadder(h.getLevel(), h.absolutePos(new BlockPos(9, 2, 5)), mouse), "a tunnel that goes only across is climbed");
+        var cow = h.spawn(EntityType.COW, new BlockPos(2, 1, 2));
+        h.assertTrue(!low.isLadder(h.getLevel(), h.absolutePos(new BlockPos(9, 2, 5)), cow), "a cow climbs a shaft of a mouse");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w113", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aMouseLooksThroughTheRoofToTheGroundAboveAndAnyoneElseSeesTheRoofAndTwoTunnelsOneOverTheOtherAreJoinedByDiggingThroughTheRoof(GameTestHelper h) {
+        floor(h);
+        for (int y = 1; y <= 4; y++) {
+            h.setBlock(new BlockPos(5, y, 5), Blocks.DIRT);
+        }
+        Player mouse = h.makeMockPlayer(), plain = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        h.setBlock(new BlockPos(5, 2, 5), MouseTunnelBlock.shut(false));       // ground above it (3) and below it (1)
+        BlockPos at = h.absolutePos(new BlockPos(5, 2, 5));
+        var state = h.getBlockState(new BlockPos(5, 2, 5));
+        var roof = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.7D, 0.3D, 0.7D, 0.95D, 0.7D));
+        var and = net.minecraft.world.phys.shapes.BooleanOp.AND;
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(state.getShape(h.getLevel(), at, net.minecraft.world.phys.shapes.CollisionContext.of(mouse)), roof, and), "a mouse is stopped by the roof with ground above it");
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(state.getShape(h.getLevel(), at, net.minecraft.world.phys.shapes.CollisionContext.of(plain)), roof, and), "someone else is not stopped by the roof of a tunnel");
+        // a tunnel above this one: the roof between is what the mouse is stopped by, and can dig through
+        h.setBlock(new BlockPos(5, 3, 5), MouseTunnelBlock.shut(false));
+        var two = h.getBlockState(new BlockPos(5, 2, 5));
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(two.getShape(h.getLevel(), at, net.minecraft.world.phys.shapes.CollisionContext.of(mouse)), roof, and), "the roof toward a tunnel above cannot be pointed at");
+        standAt(h, mouse, 5, 2, 5);
+        var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, at, net.minecraft.core.Direction.DOWN, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+        Mice.startBreaking(begin);
+        h.assertTrue(!begin.isCanceled(), "a mouse is stopped from digging through the roof to a tunnel above");
+        breakAt(h, mouse, new BlockPos(5, 2, 5));
+        h.assertTrue(MouseTunnelBlock.isOpen(h.getBlockState(new BlockPos(5, 2, 5)), net.minecraft.core.Direction.UP) && MouseTunnelBlock.isOpen(h.getBlockState(new BlockPos(5, 3, 5)), net.minecraft.core.Direction.DOWN), "the roof between was not dug through");
+        h.assertTrue(h.getBlockState(new BlockPos(5, 2, 5)).is(ModBlocks.MOUSE_TUNNEL.get()), "the tunnel block was broken");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w114", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aShaftIsWalledAllItsHeightAndEightAcrossSoAMouseGoesInAndAPersonDoesNot(GameTestHelper h) {
+        floor(h);
+        var shaft = MouseTunnelBlock.shut(false).setValue(MouseTunnelBlock.UP, true).setValue(MouseTunnelBlock.DOWN, true);
+        h.setBlock(new BlockPos(5, 2, 5), shaft);
+        BlockPos at = h.absolutePos(new BlockPos(5, 2, 5));
+        var and = net.minecraft.world.phys.shapes.BooleanOp.AND;
+        // a wall on a shut side, in the lower half and in the upper: no ring that is only at the bottom
+        for (double y : new double[]{0.2D, 0.8D}) {
+            var inWall = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, y - 0.1D, 0.02D, 0.7D, y + 0.1D, 0.2D));
+            h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(shaft.getCollisionShape(h.getLevel(), at), inWall, and), "a shaft has no wall at height " + y);
+        }
+        // eight across: a mouse (0.4) fits in the middle of it, and a person (0.6) does not
+        var mouseBox = new net.minecraft.world.phys.AABB(at.getX() + 0.3D, at.getY(), at.getZ() + 0.3D, at.getX() + 0.7D, at.getY() + 1.0D, at.getZ() + 0.7D);
+        var personBox = new net.minecraft.world.phys.AABB(at.getX() + 0.2D, at.getY(), at.getZ() + 0.2D, at.getX() + 0.8D, at.getY() + 1.0D, at.getZ() + 0.8D);
+        h.assertTrue(h.getLevel().noCollision(mouseBox), "a mouse does not fit in a shaft");
+        h.assertTrue(!h.getLevel().noCollision(personBox), "a person fits in a shaft");
+        // an open side is a mouse's opening and no one else's: the lintel is over it, the opening 8 high
+        var openNorth = shaft.setValue(MouseTunnelBlock.NORTH, true);
+        var lintel = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.6D, 0.02D, 0.7D, 0.9D, 0.2D));
+        var gap = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.1D, 0.02D, 0.7D, 0.4D, 0.2D));
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(openNorth.getCollisionShape(h.getLevel(), at), lintel, and), "an open side of a shaft has no lintel over it");
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(openNorth.getCollisionShape(h.getLevel(), at), gap, and), "an open side of a shaft is walled below the lintel");
+        // and the eye of a mouse goes through the wall of a shaft to the ground beyond it
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        var inWall = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.1D, 0.02D, 0.7D, 0.4D, 0.2D));
+        h.assertTrue(!net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(shaft.getShape(h.getLevel(), at, net.minecraft.world.phys.shapes.CollisionContext.of(mouse)), inWall, and), "the eye of a mouse is stopped by the wall of a shaft, with ground beyond it");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w115", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void theRoofUnderOpenAirIsDugOpenToTheSkyAndTheShaftReachesTheTopOfTheGround(GameTestHelper h) {
+        floor(h);
+        // a tunnel block with nothing above it (it is the top layer of the ground): the mouse points at its roof, and digs it, and it is open to the sky
+        h.setBlock(new BlockPos(5, 1, 5), MouseTunnelBlock.shut(true).setValue(MouseTunnelBlock.DOWN, true));
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        BlockPos at = h.absolutePos(new BlockPos(5, 1, 5));
+        var roof = net.minecraft.world.phys.shapes.Shapes.create(new net.minecraft.world.phys.AABB(0.3D, 0.7D, 0.3D, 0.7D, 0.95D, 0.7D));
+        var and = net.minecraft.world.phys.shapes.BooleanOp.AND;
+        var state = h.getBlockState(new BlockPos(5, 1, 5));
+        h.assertTrue(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(state.getShape(h.getLevel(), at, net.minecraft.world.phys.shapes.CollisionContext.of(mouse)), roof, and), "the roof under open air cannot be pointed at");
+        standAt(h, mouse, 5, 1, 5);
+        var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, at, net.minecraft.core.Direction.DOWN, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+        Mice.startBreaking(begin);
+        h.assertTrue(!begin.isCanceled(), "a mouse is stopped from digging the roof under open air");
+        breakAt(h, mouse, new BlockPos(5, 1, 5));
+        var after = h.getBlockState(new BlockPos(5, 1, 5));
+        h.assertTrue(after.is(ModBlocks.MOUSE_TUNNEL.get()) && MouseTunnelBlock.isOpen(after, net.minecraft.core.Direction.UP) && MouseTunnelBlock.isOpen(after, net.minecraft.core.Direction.DOWN), "the roof was not dug open: " + after);
+        h.succeed();
+    }
+
+    @GameTest(batch = "w116", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aMouseBitesThroughSmallPlantsAndCropsAndLeavesHardThingsAndFarmlandBe(GameTestHelper h) {
+        floor(h);
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        put(h, mouse, 9, 9);
+        net.minecraft.world.level.block.Block[] plants = {Blocks.GRASS, Blocks.TALL_GRASS, Blocks.FERN, Blocks.POPPY, Blocks.DANDELION, Blocks.OAK_SAPLING};
+        net.minecraft.world.level.block.Block[] crops = {Blocks.WHEAT, Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS};        // these stand on farmland, or they fall as drops
+        int count = plants.length + crops.length;
+        BlockPos[] spots = new BlockPos[count];
+        for (int i = 0; i < count; i++) {                  // all put first, apart from each other, one every second block
+            boolean crop = i >= plants.length;
+            net.minecraft.world.level.block.Block block = crop ? crops[i - plants.length] : plants[i];
+            spots[i] = new BlockPos(1 + 2 * (i % 4), 1, 1 + 2 * (i / 4));
+            h.setBlock(spots[i].below(), crop ? Blocks.FARMLAND : Blocks.GRASS_BLOCK);
+            h.setBlock(spots[i], block);
+        }
+        for (int i = 0; i < count; i++) {
+            net.minecraft.world.level.block.Block block = i >= plants.length ? crops[i - plants.length] : plants[i];
+            h.assertTrue(h.getBlockState(spots[i]).is(block), block + " did not stay where it was put: " + h.getBlockState(spots[i]) + ", below it " + h.getBlockState(spots[i].below()));
+            BlockPos at = h.absolutePos(spots[i]);
+            var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, at, net.minecraft.core.Direction.UP, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+            Mice.startBreaking(begin);
+            h.assertTrue(!begin.isCanceled(), "a mouse is stopped from biting through " + block);
+            h.assertTrue(!breakAt(h, mouse, spots[i]).isCanceled(), "a mouse's breaking of " + block + " is stopped");
+        }
+        // not stone, not a torch, not planks, not farmland
+        net.minecraft.world.level.block.Block[] hard = {Blocks.STONE, Blocks.OAK_PLANKS, Blocks.FARMLAND};
+        for (int i = 0; i < hard.length; i++) {
+            BlockPos rel = new BlockPos(2 + i, 1, 7);
+            h.setBlock(rel, hard[i]);
+            BlockPos at = h.absolutePos(rel);
+            var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, at, net.minecraft.core.Direction.UP, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+            Mice.startBreaking(begin);
+            h.assertTrue(begin.isCanceled(), "a mouse can start to dig " + hard[i]);
+            h.assertTrue(breakAt(h, mouse, rel).isCanceled(), "a mouse can break " + hard[i]);
+        }
+        h.setBlock(new BlockPos(6, 0, 7), Blocks.DIRT);
+        h.setBlock(new BlockPos(6, 1, 7), Blocks.TORCH);
+        var torch = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, h.absolutePos(new BlockPos(6, 1, 7)), net.minecraft.core.Direction.UP, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+        Mice.startBreaking(torch);
+        h.assertTrue(torch.isCanceled(), "a mouse can start to dig a torch");
+        h.succeed();
+    }
+
+    @GameTest(batch = "w117", template = "field", setupTicks = 20, timeoutTicks = 100)
+    public static void aMouseDigsAShovelPathAndHayAsItDigsDirtAndNotFarmland(GameTestHelper h) {
+        floor(h);
+        Player mouse = h.makeMockPlayer();
+        Mice.become(mouse, null, 60);
+        put(h, mouse, 3, 5);
+        for (net.minecraft.world.level.block.Block ok : new net.minecraft.world.level.block.Block[]{Blocks.DIRT_PATH, Blocks.HAY_BLOCK}) {
+            h.setBlock(new BlockPos(5, 1, 5), ok);
+            BlockPos at = h.absolutePos(new BlockPos(5, 1, 5));
+            var begin = new net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock(mouse, at, net.minecraft.core.Direction.WEST, net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock.Action.START);
+            Mice.startBreaking(begin);
+            h.assertTrue(!begin.isCanceled(), "a mouse is stopped from digging " + ok);
+            breakAt(h, mouse, new BlockPos(5, 1, 5));
+            h.assertTrue(h.getBlockState(new BlockPos(5, 1, 5)).is(ModBlocks.MOUSE_TUNNEL.get()), "a mouse did not make a tunnel of " + ok);
+        }
+        h.setBlock(new BlockPos(6, 1, 5), Blocks.FARMLAND);
+        breakAt(h, mouse, new BlockPos(6, 1, 5));
+        h.assertTrue(h.getBlockState(new BlockPos(6, 1, 5)).is(Blocks.FARMLAND), "a mouse dug farmland");
         h.succeed();
     }
 }

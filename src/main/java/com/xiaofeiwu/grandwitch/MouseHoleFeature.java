@@ -95,9 +95,15 @@ public final class MouseHoleFeature extends Feature<NoneFeatureConfiguration> {
                     continue;
                 }
                 level.setBlock(hole, ModBlocks.MOUSE_HOLE.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, out.getOpposite()), 2);
-                for (BlockPos p : tunnel) {
+                for (int i = 0; i < tunnel.size(); i++) {
+                    BlockPos p = tunnel.get(i);
                     boolean grass = level.getBlockState(p).is(Blocks.GRASS_BLOCK);
-                    level.setBlock(p, ModBlocks.MOUSE_TUNNEL.get().defaultBlockState().setValue(MouseTunnelBlock.GRASSY, grass), 2);
+                    // open to the block before it (the hole, for the first) and to the one after, and shut on the other sides
+                    BlockState block = MouseTunnelBlock.shut(grass).setValue(MouseTunnelBlock.side(out), true);
+                    if (i + 1 < tunnel.size()) {
+                        block = block.setValue(MouseTunnelBlock.side(out.getOpposite()), true);
+                    }
+                    level.setBlock(p, block, 2);
                 }
                 return true;
             }

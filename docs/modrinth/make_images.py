@@ -221,7 +221,7 @@ def title_card():
     text(im, (74, 372), "Eat her treats. Become a mouse.", font(F_BOLD, 40), fill=(255, 235, 170, 255))
     text(im, (74, 424), "Outsmart the witch.", font(F_BOLD, 40), fill=(255, 235, 170, 255))
     text(im, (74, 500), "吃了她的点心，你就变成一只老鼠。", font(F_CJK, 32), fill=(230, 215, 245, 255))
-    text(im, (74, 548), "Forge 1.20.1  ·  Singleplayer & multiplayer", font(F_BOLD, 26), fill=(190, 170, 220, 255))
+    text(im, (74, 548), "Forge 1.20.1  ·  Early release 0.1.0", font(F_BOLD, 26), fill=(190, 170, 220, 255))
     f = big(figure("grand_witch.png", hat=True), 10)
     im.alpha_composite(f, (1040, 720 - 70 - f.height + 6))
     m = big(mouse_art(), 6)

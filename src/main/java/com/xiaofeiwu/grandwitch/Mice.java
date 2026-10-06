@@ -1,5 +1,6 @@
 package com.xiaofeiwu.grandwitch;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -30,6 +31,7 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -38,6 +40,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.EnderChestBlockEntity;
 import net.minecraftforge.event.entity.living.LivingEvent;
@@ -79,7 +83,19 @@ public final class Mice {
         if (!(entity instanceof Player player)) {
             return false;
         }
-        return player.level().isClientSide ? CLIENT.contains(player.getUUID()) : player.getPersistentData().contains(KEY);
+        if (!player.level().isClientSide) {
+            return player.getPersistentData().contains(KEY);
+        }
+        if (CLIENT.contains(player.getUUID())) {
+            return true;
+        }
+        // the packet that says so may not have come (or not yet): the server's attributes are sent to every client that sees the player, and a mouse is the one with the mouse's speed
+        // (while the player is being made, this is asked for the size of it before it has its attributes: there is nothing to look at then)
+        if (player.getAttributes() == null) {
+            return false;
+        }
+        AttributeInstance speed = player.getAttribute(Attributes.MOVEMENT_SPEED);
+        return speed != null && speed.getModifier(SPEED_ID) != null;
     }
 
     public static void setClient(UUID player, boolean mouse) {
@@ -147,6 +163,7 @@ public final class Mice {
         }
         player.refreshDimensions();
         if (player instanceof ServerPlayer sp) {
+            LogUtils.getLogger().info("[grandwitch] {} is {} a mouse: telling the clients that see them", sp.getGameProfile().getName(), mouse ? "now" : "no longer");
             ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> sp), new MousePacket(sp.getUUID(), mouse));
         }
     }
@@ -164,7 +181,8 @@ public final class Mice {
 
     // ------------------------------------------------------------------ the box ------------------------------------------------------------------
 
-    @SubscribeEvent
+    /** Last of all, so that no other mod's say about the size of a player is the one that stands. */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOWEST)
     public static void size(EntityEvent.Size event) {
         if (event.getEntity() instanceof Player player && isMouse(player)) {
             event.setNewSize(EntityDimensions.scalable(0.4F, 0.4F));
@@ -438,47 +456,166 @@ public final class Mice {
             return;
         }
         event.setUseBlock(net.minecraftforge.eventbus.api.Event.Result.DENY);
-        if (cannotPlace(event.getItemStack())) {
+        if (!pawsCanUse(event.getItemStack())) {
             event.setUseItem(net.minecraftforge.eventbus.api.Event.Result.DENY);
         }
     }
 
-    private static boolean cannotPlace(ItemStack stack) {
-        return stack.getItem() instanceof net.minecraft.world.item.BlockItem || stack.getItem() instanceof net.minecraft.world.item.BucketItem;
+    /**
+     * What a mouse can do with what it holds: it can eat it and drink it (food, potions, milk, the antidote), and that is all. A tool, a weapon, a bow, a bucket, a block,
+     * shears, a lead, a spawn egg, a thrown thing are not for paws; empty-handed, it still has its teeth.
+     */
+    static boolean pawsCanUse(ItemStack stack) {
+        if (stack.isEmpty() || stack.isEdible()) {
+            return true;
+        }
+        if (stack.getItem() instanceof net.minecraft.world.item.ThrowablePotionItem) {
+            return false;                                    // a potion to throw has the same way of being held as one to drink, and is a thing thrown
+        }
+        net.minecraft.world.item.UseAnim use = stack.getUseAnimation();
+        return use == net.minecraft.world.item.UseAnim.EAT || use == net.minecraft.world.item.UseAnim.DRINK;
     }
 
     @SubscribeEvent
     public static void useItem(PlayerInteractEvent.RightClickItem event) {
-        if (isMouse(event.getEntity()) && event.getItemStack().getItem() instanceof net.minecraft.world.item.BucketItem) {
-            event.setCanceled(true);                          // not water or lava out of a bucket (milk is not one)
+        if (isMouse(event.getEntity()) && !pawsCanUse(event.getItemStack())) {
+            event.setCanceled(true);
             event.setCancellationResult(InteractionResult.FAIL);
         }
     }
 
-    /** What a mouse can dig: the soft ground, the dirt kind. */
-    static boolean diggable(BlockState state) {
-        return state.is(net.minecraft.tags.BlockTags.DIRT) && !state.is(ModBlocks.MOUSE_TUNNEL.get());       // a tunnel is of that kind, so that plants will stand on it, but it is dug already
+    /** Nothing held up to use (a bow drawn, a shield raised, a spyglass, a trident) that is not for eating or drinking. */
+    @SubscribeEvent
+    public static void startUsing(LivingEntityUseItemEvent.Start event) {
+        if (event.getEntity() instanceof Player player && isMouse(player) && !pawsCanUse(event.getItem())) {
+            event.setCanceled(true);
+        }
     }
 
-    /** Level with the mouse: a tunnel is a cross, open on each side and not up or down, so what is dug under it or over it could not be got to. */
+    /** No lead put on a cow, no sheep sheared, no bucket filled at a cow, with paws: an animal is not used with a tool. */
+    @SubscribeEvent
+    public static void useOnEntity(PlayerInteractEvent.EntityInteract event) {
+        if (isMouse(event.getEntity()) && !pawsCanUse(event.getItemStack())) {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.FAIL);
+        }
+    }
+
+    /** No blow with a sword or an axe: with something in its paws that is not to eat, a mouse does not strike at all (it can with nothing in them, as it could). */
+    @SubscribeEvent
+    public static void strike(net.minecraftforge.event.entity.player.AttackEntityEvent event) {
+        if (isMouse(event.getEntity()) && !pawsCanUse(event.getEntity().getMainHandItem())) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
+     * What a mouse can bite through at once, and need not dig: the small plants that grow on the ground (grass, tall grass, ferns, flowers, saplings, and what other mods have of the
+     * kind: a soft plant of the bush kind), and crops too (a mouse takes what grows: wheat, carrots, potatoes). They are in the way of what is under them, and are not "hard".
+     */
+    static boolean plant(net.minecraft.world.level.BlockGetter level, BlockPos pos, BlockState state) {
+        if (state.is(net.minecraft.tags.BlockTags.FLOWERS) || state.is(net.minecraft.tags.BlockTags.SAPLINGS) || state.is(Blocks.GRASS) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN)
+                || state.is(Blocks.LARGE_FERN) || state.is(Blocks.DEAD_BUSH)) {
+            return true;
+        }
+        return state.getBlock() instanceof net.minecraft.world.level.block.BushBlock && state.getDestroySpeed(level, pos) == 0.0F;
+    }
+
+    /** What a mouse can dig: the soft ground, the dirt kind. */
+    static boolean diggable(BlockState state) {
+        // the dirt kind, and the path that a shovel flattens grass to, and hay: what is soft to dig, and not farmland (which a mouse would spoil)
+        return (state.is(net.minecraft.tags.BlockTags.DIRT) || state.is(Blocks.DIRT_PATH) || state.is(Blocks.HAY_BLOCK)) && !state.is(ModBlocks.MOUSE_TUNNEL.get());       // a tunnel is of that kind, so that plants will stand on it, but it is dug already
+    }
+
+    /**
+     * Where a mouse can dig: level with it, and the block straight above it and the one straight below it (a way up and a way down, which is a shaft: it is climbed as a ladder is).
+     */
     static boolean sameLevel(Player player, BlockPos pos) {
-        return pos.getY() == player.blockPosition().getY();
+        BlockPos at = player.blockPosition();
+        int dy = pos.getY() - at.getY();
+        return dy == 0 || ((dy == 1 || dy == -1) && pos.getX() == at.getX() && pos.getZ() == at.getZ());
+    }
+
+    private static final Map<UUID, Integer> TOLD_WHY = new ConcurrentHashMap<>();
+    private static final Map<UUID, Direction> WALL = new ConcurrentHashMap<>();
+
+    /** Why a mouse cannot dig what it is pointing at, or null if it can. */
+    static String whyNotDig(Player player, BlockPos pos) {
+        BlockState state = player.level().getBlockState(pos);
+        if (plant(player.level(), pos, state)) {
+            return null;                                   // a plant is bitten through, not dug
+        }
+        if (state.is(ModBlocks.MOUSE_TUNNEL.get())) {
+            return "message.grandwitch.dig_tunnel";
+        }
+        if (!diggable(state)) {
+            return "message.grandwitch.dig_hard";
+        }
+        return sameLevel(player, pos) ? null : "message.grandwitch.dig_level";
+    }
+
+    /**
+     * The shut wall (or roof) of a tunnel block that a mouse is pointing at, if it can be dug through: where what is beyond it is another tunnel (or, to the side, a hole). (The eye
+     * of a mouse comes to a wall or a roof only where that is so: elsewhere it goes through to the ground.) Or null.
+     */
+    static Direction wallPointedAt(Player player, BlockPos pos, Direction face) {
+        BlockState state = player.level().getBlockState(pos);
+        if (!state.is(ModBlocks.MOUSE_TUNNEL.get())) {
+            return null;
+        }
+        if (face == null) {
+            return null;
+        }
+        // from inside the block it is the inner face of a wall (or the underside of the roof) that is hit: that wall is the opposite side; from outside, the outer face of it
+        Direction side = player.blockPosition().equals(pos) ? face.getOpposite() : face;
+        return !MouseTunnelBlock.isOpen(state, side) && MouseTunnelBlock.joinsToward(player.level(), pos.relative(side), side) ? side : null;
     }
 
     @SubscribeEvent
     public static void startBreaking(PlayerInteractEvent.LeftClickBlock event) {
         Player player = event.getEntity();
-        if (isMouse(player) && !(diggable(player.level().getBlockState(event.getPos())) && sameLevel(player, event.getPos()))) {
+        if (!isMouse(player)) {
+            return;
+        }
+        Direction wall = wallPointedAt(player, event.getPos(), event.getFace());
+        if (wall != null) {
+            WALL.put(player.getUUID(), wall);                  // it is let to begin: and when it is done, that side is open
+            return;
+        }
+        String why = whyNotDig(player, event.getPos());
+        if (why != null) {
             event.setCanceled(true);
+            // and it is told why (on the side that cancels it: the client's, or else the server's), not more than once in a second and a half
+            Integer last = TOLD_WHY.get(player.getUUID());
+            if (last == null || player.tickCount - last > 30 || player.tickCount < last) {
+                TOLD_WHY.put(player.getUUID(), player.tickCount);
+                player.displayClientMessage(Component.translatable(why), true);
+            }
         }
     }
 
-    /** A mouse digs slowly. */
+    /**
+     * A mouse digs soft ground as quickly as with a shovel (the speed is in the settings), whatever it holds; as elsewhere, a fifth of that in the air or under water.
+     * What it cannot dig it does not dig, and slowly.
+     */
     @SubscribeEvent
     public static void digSpeed(net.minecraftforge.event.entity.player.PlayerEvent.BreakSpeed event) {
-        if (isMouse(event.getEntity())) {
-            event.setNewSpeed(event.getNewSpeed() * 0.6F);
+        Player player = event.getEntity();
+        if (!isMouse(player)) {
+            return;
         }
+        if (!diggable(event.getState()) && !event.getState().is(ModBlocks.MOUSE_TUNNEL.get())) {
+            event.setNewSpeed(Math.min(event.getNewSpeed(), 1.0F) * 0.6F);
+            return;
+        }
+        float speed = WitchConfig.MOUSE_DIG_SPEED.get().floatValue();
+        if (!player.onGround()) {
+            speed /= 5.0F;
+        }
+        if (player.isEyeInFluid(net.minecraft.tags.FluidTags.WATER)) {
+            speed /= 5.0F;
+        }
+        event.setNewSpeed(speed);
     }
 
     /**
@@ -491,7 +628,21 @@ public final class Mice {
         if (!isMouse(player)) {
             return;
         }
+        if (plant(event.getLevel(), event.getPos(), event.getState())) {
+            return;                                        // a small plant is bitten off, as it would be by anyone, and gives what it gives
+        }
         event.setCanceled(true);
+        if (event.getState().is(ModBlocks.MOUSE_TUNNEL.get())) {
+            // a wall of a tunnel, dug through: it is the side that was pointed at when the digging began, and no block is broken
+            Direction wall = WALL.remove(player.getUUID());
+            if (wall != null && event.getLevel() instanceof ServerLevel level && !MouseTunnelBlock.isOpen(event.getState(), wall) && MouseTunnelBlock.joinsToward(level, event.getPos().relative(wall), wall)) {
+                MouseTunnelBlock.openSide(level, event.getPos(), wall);
+                level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, Blocks.DIRT.defaultBlockState()), event.getPos().getX() + 0.5D + wall.getStepX() * 0.45D, event.getPos().getY() + 0.25D,
+                        event.getPos().getZ() + 0.5D + wall.getStepZ() * 0.45D, 10, 0.2D, 0.15D, 0.2D, 0.05D);
+                level.playSound(null, event.getPos(), SoundType.GRAVEL.getBreakSound(), SoundSource.BLOCKS, 0.6F, 1.4F);
+            }
+            return;
+        }
         if (!(event.getLevel() instanceof ServerLevel level) || !diggable(event.getState()) || !sameLevel(player, event.getPos())) {
             if (!player.level().isClientSide && diggable(event.getState())) {
                 player.displayClientMessage(Component.translatable("message.grandwitch.dig_level"), true);
@@ -499,9 +650,70 @@ public final class Mice {
             return;
         }
         BlockPos pos = event.getPos();
-        level.setBlock(pos, ModBlocks.MOUSE_TUNNEL.get().defaultBlockState().setValue(MouseTunnelBlock.GRASSY, event.getState().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)), 3);       // dug out of grass, it keeps its grass
+        // shut on every side but the one dug through: toward where the mouse is (the block it stands in, or the tunnel next to this one that it is nearest), and that block opens to this one
+        BlockState dug = MouseTunnelBlock.shut(event.getState().is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK));       // dug out of grass, it keeps its grass
+        BlockPos mouseBlock = player.blockPosition();
+        Direction through;
+        if (pos.getY() != mouseBlock.getY()) {
+            // up or down from where the mouse is: this block is open to it (to the one it is in, below it or above it), and the roof of the one below is gone, or there is no floor to the one above
+            through = pos.getY() > mouseBlock.getY() ? Direction.DOWN : Direction.UP;
+            dug = dug.setValue(MouseTunnelBlock.side(through), true);
+            BlockState here = level.getBlockState(mouseBlock);
+            if (here.is(ModBlocks.MOUSE_TUNNEL.get())) {
+                level.setBlock(mouseBlock, here.setValue(MouseTunnelBlock.side(through.getOpposite()), true), 3);
+            }
+            through = null;
+        } else {
+            through = throughWhich(level, pos, player);
+            if (through != null) {
+                dug = dug.setValue(MouseTunnelBlock.side(through), true);
+            }
+        }
+        for (Direction d : Direction.Plane.HORIZONTAL) {                  // and open to open air, as the mouth of a cave is: only what is ground is shut until it is dug
+            BlockState beyond = level.getBlockState(pos.relative(d));
+            if (!beyond.blocksMotion() && beyond.getFluidState().isEmpty() && !beyond.is(ModBlocks.MOUSE_TUNNEL.get()) && !beyond.is(ModBlocks.MOUSE_HOLE.get())) {
+                dug = dug.setValue(MouseTunnelBlock.side(d), true);
+            }
+        }
+        level.setBlock(pos, dug, 3);
+        if (through != null) {
+            BlockPos beyond = pos.relative(through);
+            BlockState other = level.getBlockState(beyond);
+            if (other.is(ModBlocks.MOUSE_TUNNEL.get())) {
+                level.setBlock(beyond, other.setValue(MouseTunnelBlock.side(through.getOpposite()), true), 3);
+            }
+        }
         level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(ParticleTypes.BLOCK, event.getState()), pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 10, 0.25D, 0.25D, 0.25D, 0.05D);
         level.playSound(null, pos, event.getState().getSoundType().getBreakSound(), SoundSource.BLOCKS, 0.6F, 1.4F);
+    }
+
+    /**
+     * Which side of a block just dug is the way through: toward the block the mouse is in, if that is by it; or else toward the tunnel or hole by it that the mouse is nearest to;
+     * or else, none being by, toward where the mouse is.
+     */
+    static Direction throughWhich(net.minecraft.world.level.Level level, BlockPos dug, Player player) {
+        BlockPos mouse = player.blockPosition();
+        Direction best = null;
+        double nearest = Double.MAX_VALUE;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            BlockPos n = dug.relative(d);
+            BlockState s = level.getBlockState(n);
+            if (n.equals(mouse) || s.is(ModBlocks.MOUSE_TUNNEL.get()) || s.is(ModBlocks.MOUSE_HOLE.get())) {
+                double distance = player.distanceToSqr(n.getX() + 0.5D, n.getY() + 0.5D, n.getZ() + 0.5D);
+                if (distance < nearest) {
+                    nearest = distance;
+                    best = d;
+                }
+            }
+        }
+        if (best != null) {
+            return best;
+        }
+        double dx = player.getX() - (dug.getX() + 0.5D), dz = player.getZ() - (dug.getZ() + 0.5D);
+        if (Math.abs(dx) < 1.0E-3D && Math.abs(dz) < 1.0E-3D) {
+            return null;
+        }
+        return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Direction.EAST : Direction.WEST) : (dz > 0 ? Direction.SOUTH : Direction.NORTH);
     }
 
     // ------------------------------------------------------------------ squeaking ------------------------------------------------------------------

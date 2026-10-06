@@ -1,10 +1,195 @@
 {
-  "variants": {
-    "grassy=false": {
-      "model": "grandwitch:block/mouse_tunnel_core"
+  "multipart": [
+    {
+      "when": {
+        "up": "false",
+        "down": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_posts"
+      }
     },
-    "grassy=true": {
-      "model": "grandwitch:block/mouse_tunnel_core_grassy"
+    {
+      "when": {
+        "up": "false",
+        "grassy": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_roof"
+      }
+    },
+    {
+      "when": {
+        "up": "false",
+        "grassy": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_roof_grassy"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "up": "false",
+        "down": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_wall"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_wall"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_lintel"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "up": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_low"
+      }
+    },
+    {
+      "when": {
+        "east": "false",
+        "up": "false",
+        "down": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_wall",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_wall_trim",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_lintel_trim",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "false",
+        "up": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_low_trim",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "up": "false",
+        "down": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_wall",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_wall",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_lintel",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "up": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_low",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "false",
+        "up": "false",
+        "down": "false"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_wall",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_wall_trim",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_lintel_trim",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "false",
+        "up": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "grandwitch:block/mouse_tunnel_shaft_low_trim",
+        "y": 270
+      }
     }
-  }
+  ]
 }

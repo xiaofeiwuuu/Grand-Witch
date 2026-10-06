@@ -18,6 +18,7 @@ public final class WitchConfig {
     static final ForgeConfigSpec.BooleanValue TURNS_CHILDREN;
     static final ForgeConfigSpec.BooleanValue WITCH_REACH;
     static final ForgeConfigSpec.BooleanValue HUT_RESPAWN;
+    static final ForgeConfigSpec.DoubleValue MOUSE_DIG_SPEED;
     static final ForgeConfigSpec.BooleanValue WORLD_HOLES;
     static final ForgeConfigSpec.DoubleValue WORLD_HOLE_CHANCE;
     static final ForgeConfigSpec.DoubleValue VIRUS_CHANCE;
@@ -81,6 +82,7 @@ public final class WitchConfig {
         VIRUS_WITCH_CHANCE = b.comment("The chance the witch drops a plague virus when she dies.").defineInRange("plagueVirusWitchChance", 0.5, 0.0, 1.0);
         WORLD_HOLES = b.comment("Whether mouse holes come up on their own in the world, in the side of banks of soft ground, in the plains, the forests and the hills (only in the chunks made after it is on).").define("worldMouseHoles", true);
         WORLD_HOLE_CHANCE = b.comment("The chance, in each chunk, that a hole is tried for (one is not always found a place: a bank of soft ground is wanted).").defineInRange("worldMouseHoleChance", 0.03, 0.0, 1.0);
+        MOUSE_DIG_SPEED = b.comment("How fast a mouse digs soft ground (dirt, grass), as the speed of a tool: 1 is bare hands, 4 a stone shovel, 6 an iron one, 8 a diamond one. It is a fifth of that in the air or under water. Other blocks it cannot dig.").defineInRange("mouseDigSpeed", 6.0, 1.0, 30.0);
         HUT_RESPAWN = b.comment("Whether a house whose witch is dead (or gone) gets a new one, of itself, now and then, while someone is near it.").define("hutRespawn", true);
         HUT_RESPAWN_CHANCE = b.comment("The chance, each minute, that a witch comes to a house of hers that stands empty, with a player within 96 blocks of it and no other witch within 160 (0.02 is about one in fifty minutes).").defineInRange("hutRespawnChance", 0.02, 0.0, 1.0);
         WITCH_REACH = b.comment("Whether the witch lies down at the mouth of a mouse tunnel and reaches into it (up to 5 blocks of tunnel along) to pull out a mouse she was after.").define("witchReach", true);
